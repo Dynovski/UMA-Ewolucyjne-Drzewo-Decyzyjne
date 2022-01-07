@@ -10,7 +10,6 @@ def get_basic_tree_classifier(data: dt.Data) -> tree.DecisionTreeClassifier:
     train, validate, test = data.train_validate_test_split()
     labels = train[data.class_column_name]
     data_df = train.loc[:, train.columns != data.class_column_name]
-    clf = tree.DecisionTreeClassifier()
     return tree.DecisionTreeClassifier().fit(data_df, labels)
 
 
