@@ -3,9 +3,11 @@ import pandas as pd
 
 from typing import List, Dict, Tuple, Any
 
+import config as cfg
+
 
 class Data:
-    def __init__(self, data_path: str, class_column_name: str, attributes: List[str], separator: str=','):
+    def __init__(self, data_path: str, class_column_name: str, attributes: List[str], separator: str = ','):
         self.class_column_name: str = class_column_name
         self.attributes: List[str] = attributes
         self.data: pd.DataFrame = pd.read_csv(data_path, header=None, sep=separator)
@@ -14,16 +16,14 @@ class Data:
         self.attribute_info_d: Dict[str, Dict[str, Any]] = {}
         self._get_attributes_info()
 
-    def train_validate_test_split(self, train_ratio=.6, validate_ratio=.2, seed=None) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def train_test_split(self, train_ratio=cfg.TRAIN_RATIO, seed=None) -> Tuple[pd.DataFrame, pd.DataFrame]:
         np.random.seed(seed)
         permuted_indices = np.random.permutation(self.data.index)
         len_data: int = len(self.data.index)
         train_end_idx: int = int(train_ratio * len_data)
-        validate_end_idx: int = int(validate_ratio * len_data) + train_end_idx
         train: pd.DataFrame = self.data.iloc[permuted_indices[:train_end_idx]]
-        validate: pd.DataFrame = self.data.iloc[permuted_indices[train_end_idx:validate_end_idx]]
-        test: pd.DataFrame = self.data.iloc[permuted_indices[validate_end_idx:]]
-        return train, validate, test
+        test: pd.DataFrame = self.data.iloc[permuted_indices[train_end_idx:]]
+        return train, test
 
     def _get_attributes_info(self):
         for attribute in self.attributes:
