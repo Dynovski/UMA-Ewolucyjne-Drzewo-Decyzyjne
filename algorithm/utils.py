@@ -2,6 +2,7 @@ import numpy as np
 
 from sklearn import tree
 from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import cross_val_score
 
 import data_processing.data as dt
 
@@ -21,3 +22,10 @@ def get_confusion_matrix(clf: tree.DecisionTreeClassifier, data: dt.Data) -> np.
     matrix = confusion_matrix(test_data, predictions, labels=data.classes)
     return matrix
 
+
+def cross_validate(model, data: np.ndarray, labels: np.ndarray, num_splits: int, num_repeats: int = 25) -> float:
+    accuracy: float = 0.0
+    for _ in range(num_repeats):
+        scores: np.ndarray = cross_val_score(model, data, labels, cv=num_splits, n_jobs=4)
+        accuracy += scores.mean()
+    return accuracy / num_repeats

@@ -15,6 +15,23 @@ class Data:
         self.classes: List[str] = list(self.data[self.class_column_name].unique())
         self.attribute_info_d: Dict[str, Dict[str, Any]] = {}
         self._get_attributes_info()
+        self.train_data, self.test_data = self.train_test_split()
+
+    @property
+    def train_inputs(self) -> np.ndarray:
+        return self.train_data[self.attributes].to_numpy()
+
+    @property
+    def train_labels(self) -> np.ndarray:
+        return self.train_data[self.class_column_name].to_numpy()
+
+    @property
+    def test_inputs(self) -> np.ndarray:
+        return self.test_data[self.attributes].to_numpy()
+
+    @property
+    def test_labels(self) -> np.ndarray:
+        return self.test_data[self.class_column_name].to_numpy()
 
     def train_test_split(self, train_ratio=cfg.TRAIN_RATIO, seed=None) -> Tuple[pd.DataFrame, pd.DataFrame]:
         np.random.seed(seed)
