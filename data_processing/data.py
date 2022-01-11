@@ -14,8 +14,8 @@ class Data:
         self.data.set_axis(attributes + [class_column_name], axis=1, inplace=True)
         self.classes: List[str] = list(self.data[self.class_column_name].unique())
         self.attribute_info_d: Dict[str, Dict[str, Any]] = {}
-        self._get_attributes_info()
         self.train_data, self.test_data = self.train_test_split()
+        self._get_attributes_info()
 
     @property
     def train_inputs(self) -> np.ndarray:
@@ -33,6 +33,10 @@ class Data:
     def test_labels(self) -> np.ndarray:
         return self.test_data[self.class_column_name].to_numpy()
 
+    @property
+    def data_info(self) -> Dict[str, Dict[str, Any]]:
+        return self.attribute_info_d
+
     def train_test_split(self, train_ratio=cfg.TRAIN_RATIO, seed=None) -> Tuple[pd.DataFrame, pd.DataFrame]:
         np.random.seed(seed)
         permuted_indices = np.random.permutation(self.data.index)
@@ -45,14 +49,14 @@ class Data:
     def _get_attributes_info(self):
         for attribute in self.attributes:
             info: Dict[str, Any] = {}
-            data_types = self.data.dtypes
+            data_types = self.train_data.dtypes
             if data_types[attribute] == 'float64' or data_types[attribute] == 'int64':
                 info['is_string'] = False
-                info['min_value'] = self.data[attribute].min()
-                info['max_value'] = self.data[attribute].max()
+                info['min_value'] = self.train_data[attribute].min()
+                info['max_value'] = self.train_data[attribute].max()
             else:
                 info['is_string'] = True
-                info['possible_values'] = self.data[attribute].unique()
+                info['possible_values'] = self.train_data[attribute].unique()
             self.attribute_info_d[attribute] = info
 
     def drop_columns_in_place(self, columns: List[str]):

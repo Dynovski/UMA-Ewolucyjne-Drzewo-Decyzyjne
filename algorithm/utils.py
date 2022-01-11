@@ -1,31 +1,34 @@
 import numpy as np
 
-from sklearn import tree
 from sklearn.metrics import confusion_matrix
-from sklearn.model_selection import cross_val_score
+from typing import Any, List
 
-import data_processing.data as dt
-
-
-def get_basic_trained_tree_classifier(data: dt.Data) -> tree.DecisionTreeClassifier:
-    train, test = data.train_test_split()
-    labels = train[data.class_column_name]
-    data_df = train.loc[:, train.columns != data.class_column_name]
-    return tree.DecisionTreeClassifier().fit(data_df, labels)
+from data_processing.data import Data
 
 
-def get_confusion_matrix(clf: tree.DecisionTreeClassifier, data: dt.Data) -> np.ndarray:
-    train, test = data.train_test_split()
-    test_data = list(test[data.class_column_name])
-    validate_arguments = test.loc[:, test.columns != data.class_column_name]
-    predictions = list(clf.predict(validate_arguments))
-    matrix = confusion_matrix(test_data, predictions, labels=data.classes)
+def get_confusion_matrix(clf: Any, data: Data) -> np.ndarray:
+    test_labels = data.test_labels
+    test_data = data.test_inputs
+    predictions = list(clf.predict(test_data))
+    matrix = confusion_matrix(test_labels, predictions, labels=data.classes)
     return matrix
 
 
 def cross_validate(model, data: np.ndarray, labels: np.ndarray, num_splits: int, num_repeats: int = 25) -> float:
     accuracy: float = 0.0
-    for _ in range(num_repeats):
-        scores: np.ndarray = cross_val_score(model, data, labels, cv=num_splits, n_jobs=4)
-        accuracy += scores.mean()
-    return accuracy / num_repeats
+    for k in range(num_repeats):
+        indices = np.random.permutation(data.shape[0])
+        shuffled_data: np.ndarray = data[indices]
+        shuffled_labels: np.ndarray = labels[indices]
+        data_splits: List[np.ndarray] = np.array_split(shuffled_data, num_splits)
+        labels_splits: List[np.ndarray] = np.array_split(shuffled_labels, num_splits)
+        for i in range(num_splits):
+            train_data: np.ndarray = np.vstack(data_splits[:i] + data_splits[i + 1:])
+            train_labels: np.ndarray = np.hstack(labels_splits[:i] + labels_splits[i + 1:])
+            test_data: np.ndarray = data_splits[i]
+            test_labels: np.ndarray = labels_splits[i]
+            model.fit(train_data, train_labels)
+            score: float = model.score(test_data, test_labels)
+            print(f'{k}.{i}: accuracy: {score}')
+            accuracy += score
+    return accuracy / (num_repeats * num_splits)
