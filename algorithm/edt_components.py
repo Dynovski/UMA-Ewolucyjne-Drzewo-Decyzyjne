@@ -4,10 +4,12 @@ from math import inf
 from random import randint, random, choice, uniform, randrange
 from enum import Enum
 from typing import Union, Optional, Dict, Any, List
+
+import pandas as pd
 from sklearn.metrics import accuracy_score, matthews_corrcoef
 
 import config as cfg
-
+from data_processing.data import Data
 
 class NodeType(Enum):
     ROOT = 0
@@ -19,28 +21,22 @@ class Node:
     def __init__(
             self,
             parent: Optional['Node'],
+            selected_attribute: Optional[str],
+            attribute_idx: Optional[int],
+            threshold: Optional[Union[float, str, int]],
             node_type: NodeType,
-            data: np.ndarray,
-            labels: np.ndarray
-            # selected_attribute: Optional[str],
-            # attribute_idx: Optional[int],
-            # threshold: Optional[Union[float, str, int]],
-            # node_type: NodeType,
-            # left_child: Optional['Node'] = None,
-            # right_child: Optional['Node'] = None,
-            # label: Optional[str] = None
+            left_child: Optional['Node'] = None,
+            right_child: Optional['Node'] = None,
+            label: Optional[str] = None
     ):
         self.parent: Optional[Node] = parent
-        # self.attribute: str = selected_attribute
-        # self.attribute_idx = attribute_idx
-        # self.threshold: Union[float, str, int] = threshold
+        self.attribute: str = selected_attribute
+        self.attribute_idx = attribute_idx
+        self.threshold: Union[float, str, int] = threshold
         self.node_type: NodeType = node_type
-        # self.left_child: Optional[Node] = left_child
-        # self.right_child: Optional[Node] = right_child
-        # self.label: Optional[str] = label
-        num_attributes =
-
-
+        self.left_child: Optional[Node] = left_child
+        self.right_child: Optional[Node] = right_child
+        self.label: Optional[str] = label
 
     def copy(self) -> 'Node':
         node: 'Node' = Node(self.parent, self.attribute, self.attribute_idx, self.threshold, self.node_type, label=self.label)
@@ -95,79 +91,69 @@ class CandidateTree:
     def random_subtree(self) -> Node:
         return self.root.random_node()
 
-    def score(self, data: np.ndarray, labels: np.ndarray) -> float:
-        if self.fitness != inf:
-            return self.fitness
-        predictions: List[str] = [self.root.predict(x) for x in data]
-        self.fitness = accuracy_score(labels, predictions)
-        return self.fitness
+    def score(self, data: pd.DataFrame, labels: pd.Series) -> float:
+        predictions: List[str] = [self.root.predict(x) for x in data.values]
+        return accuracy_score(labels.to_list(), predictions)
 
-    def predict(self, data: np.ndarray):
-        labels: List[str] = []
-        for i in range(data.shape[0]):
-            x = data[i]
-            labels.append(self.root.predict(x))
+    def predict(self, data: pd.DataFrame):
+        labels: List[str] = [self.root.predict(x) for x in data.values]
         return np.asarray(labels)
 
     @staticmethod
-    def generate_tree(split_prob: float, data: np.ndarray, labels: np.ndarray) -> 'CandidateTree':
-        num_attributes: int = data.shape[1]
-        ranges = []
-        for i in range(attributes):
-            vals = [tmp[i] for tmp in x]
-            ranges.append((min(vals), max(vals)))
-        labels = np.unique(y)
+    def generate_tree(split_prob: float, data: pd.DataFrame, labels: pd.Series) -> 'CandidateTree':
+        attributes_info: Dict[str, Dict[str, Any]] = Data.attributes_info(data)
 
-        P = []
-        for _ in range(self.mi):
-            root = generate_subtree(self.p_split, attributes, ranges, labels)
-            value = self.ga_fun(root, x, y)
-            P.append(Tree(root, value))
-
-        def _get_attributes_info(self):
-            for attribute in self.attributes:
-                info: Dict[str, Any] = {}
-                data_types = self.train_data.dtypes
-                if data_types[attribute] == 'float64' or data_types[attribute] == 'int64':
-                    info['is_string'] = False
-                    info['min_value'] = self.train_data[attribute].min()
-                    info['max_value'] = self.train_data[attribute].max()
-                else:
-                    info['is_string'] = True
-                    info['possible_values'] = self.train_data[attribute].unique()
-                self.attribute_info_d[attribute] = info
-        attributes: List[str] = list(data_info.keys())
+        attributes: List[str] = list(attributes_info.keys())
         attribute_idx: int = randrange(len(attributes))
         attribute = attributes[attribute_idx]
-        attr_data: Dict[str, Any] = data_info[attribute]
+        attr_data: Dict[str, Any] = attributes_info[attribute]
         threshold = None
         if attr_data['is_string']:
             threshold = choice(attr_data['possible_values'])
         else:
             threshold = round(uniform(attr_data['min_value'], attr_data['max_value']), 3)
 
+        left_child_data: pd.DataFrame = data.loc[data[attribute] <= threshold]
+        left_child_labels: pd.Series = labels.loc[data[attribute] <= threshold]
+        right_child_data: pd.DataFrame = data.loc[data[attribute] > threshold]
+        right_child_labels: pd.Series = labels.loc[data[attribute] > threshold]
         root: Node = Node(None, attribute, attribute_idx, threshold, NodeType.ROOT)
-        root.left_child = CandidateTree.generate_subtree(root, split_prob, data_info, data_classes)
-        root.right_child = CandidateTree.generate_subtree(root, split_prob, data_info, data_classes)
+        if left_child_data.shape[0] == 0 or right_child_data.shape[0] == 0:
+            # there always must be at least root and two children
+            root.left_child = Node(None, None, None, None, NodeType.LEAF, label=labels.value_counts().idxmax())
+            root.right_child = Node(None, None, None, None, NodeType.LEAF, label=labels.value_counts().idxmax())
+        else:
+            root.left_child = CandidateTree.generate_subtree(root, split_prob, left_child_data, left_child_labels)
+            root.right_child = CandidateTree.generate_subtree(root, split_prob, right_child_data, right_child_labels)
         return CandidateTree(root)
 
     @staticmethod
-    def generate_subtree(parent: Node, split_prob: float, data_info: Dict[str, Dict[str, Any]], data_classes: List[str], depth: int = 2) -> Node:
+    def generate_subtree(parent: Node, split_prob: float, data: pd.DataFrame, labels: pd.Series, depth: int = 2) -> Node:
         if random() < split_prob and depth <= cfg.MAX_TREE_DEPTH:
-            attributes: List[str] = list(data_info.keys())
+            attributes_info: Dict[str, Dict[str, Any]] = Data.attributes_info(data)
+
+            attributes: List[str] = list(attributes_info.keys())
             attribute_idx: int = randrange(len(attributes))
             attribute = attributes[attribute_idx]
-            attr_data = data_info[attribute]
+            attr_data = attributes_info[attribute]
             threshold = None
             if attr_data['is_string']:
                 threshold = choice(attr_data['possible_values'])
             else:
                 threshold = round(uniform(attr_data['min_value'], attr_data['max_value']), 3)
 
-            node: Node = Node(parent, attribute, attribute_idx, threshold, NodeType.NORMAL)
-            node.left_child = CandidateTree.generate_subtree(node, split_prob, data_info, data_classes, depth + 1)
-            node.right_child = CandidateTree.generate_subtree(node, split_prob, data_info, data_classes, depth + 1)
+            left_child_data: pd.DataFrame = data.loc[data[attribute] <= threshold]
+            left_child_labels: pd.Series = labels.loc[data[attribute] <= threshold]
+            right_child_data: pd.DataFrame = data.loc[data[attribute] > threshold]
+            right_child_labels: pd.Series = labels.loc[data[attribute] > threshold]
+            node: Optional[Node] = None
+            if left_child_data.shape[0] == 0 or right_child_data.shape[0] == 0:
+                node: Node = Node(parent, None, None, None, NodeType.LEAF, label=labels.value_counts().idxmax())
+            else:
+                node: Node = Node(parent, attribute, attribute_idx, threshold, NodeType.NORMAL)
+                node.left_child = CandidateTree.generate_subtree(node, split_prob, left_child_data, left_child_labels, depth + 1)
+                node.right_child = CandidateTree.generate_subtree(node, split_prob, right_child_data, right_child_labels, depth + 1)
             return node
         else:
-            label = choice(data_classes)
+            label = labels.value_counts().idxmax()
             return Node(parent, None, None, None, NodeType.LEAF, label=label)

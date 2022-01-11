@@ -1,9 +1,6 @@
-import numpy as np
 import pandas as pd
 
-from typing import List, Dict, Tuple, Any
-
-import config as cfg
+from typing import List, Dict, Any
 
 
 class Data:
@@ -13,57 +10,28 @@ class Data:
         self.data: pd.DataFrame = pd.read_csv(data_path, header=None, sep=separator)
         self.data.set_axis(attributes + [class_column_name], axis=1, inplace=True)
         self.classes: List[str] = list(self.data[self.class_column_name].unique())
-        self.attribute_info_d: Dict[str, Dict[str, Any]] = {}
-        self.train_data, self.test_data = self.train_test_split()
-        self._get_attributes_info()
 
-    @property
-    def train_inputs(self) -> np.ndarray:
-        return self.train_data[self.attributes].to_numpy()
+    def get_data(self) -> pd.DataFrame:
+        return self.data[self.attributes]
 
-    @property
-    def train_labels(self) -> np.ndarray:
-        return self.train_data[self.class_column_name].to_numpy()
+    def get_labels(self) -> pd.DataFrame:
+        return self.data[self.class_column_name]
 
-    @property
-    def test_inputs(self) -> np.ndarray:
-        return self.test_data[self.attributes].to_numpy()
-
-    @property
-    def test_labels(self) -> np.ndarray:
-        return self.test_data[self.class_column_name].to_numpy()
-
-    @property
-    def data_info(self) -> Dict[str, Dict[str, Any]]:
-        return self.attribute_info_d
-
-    def train_test_split(self, train_ratio=cfg.TRAIN_RATIO, seed=None) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        np.random.seed(seed)
-        permuted_indices = np.random.permutation(self.data.index)
-        len_data: int = len(self.data.index)
-        train_end_idx: int = int(train_ratio * len_data)
-        train: pd.DataFrame = self.data.iloc[permuted_indices[:train_end_idx]]
-        test: pd.DataFrame = self.data.iloc[permuted_indices[train_end_idx:]]
-        return train, test
-
-    def _get_attributes_info(self):
-        for attribute in self.attributes:
+    @staticmethod
+    def attributes_info(data: pd.DataFrame) -> Dict[str, Dict[str, Any]]:
+        attribute_info_d: Dict[str, Dict[str, Any]] = {}
+        for attribute in data.columns.tolist():
             info: Dict[str, Any] = {}
-            data_types = self.train_data.dtypes
+            data_types = data.dtypes
             if data_types[attribute] == 'float64' or data_types[attribute] == 'int64':
                 info['is_string'] = False
-                info['min_value'] = self.train_data[attribute].min()
-                info['max_value'] = self.train_data[attribute].max()
+                info['min_value'] = data[attribute].min()
+                info['max_value'] = data[attribute].max()
             else:
                 info['is_string'] = True
-                info['possible_values'] = self.train_data[attribute].unique()
-            self.attribute_info_d[attribute] = info
-
-    def drop_columns_in_place(self, columns: List[str]):
-        self.data = self.data.drop(columns, axis=1)
-        self.attributes = [attribute for attribute in self.attributes if attribute not in columns]
-        for column in columns:
-            self.attribute_info_d.pop(column, None)
+                info['possible_values'] = data[attribute].unique()
+            attribute_info_d[attribute] = info
+        return attribute_info_d
 
 
 class IrisData(Data):
@@ -79,7 +47,7 @@ class AbaloneData(Data):
     def __init__(self):
         super(AbaloneData, self).__init__(
             'data/Abalone/abalone.data',
-            'Rings',
+            'Class',
             ['Sex', 'Lenght', 'Diameter', 'Height', 'Whole weight',
              'Shucked weight', 'Viscera weight', 'Shell weight']
         )
