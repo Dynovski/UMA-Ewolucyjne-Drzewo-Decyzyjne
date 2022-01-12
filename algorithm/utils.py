@@ -1,6 +1,7 @@
 # Author: Zbigniew Dynowski
 import pandas as pd
 
+from multiprocessing import Process, Queue
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score, matthews_corrcoef
 from random import randrange, choice, uniform
@@ -10,13 +11,14 @@ from config import ALPHA, BETA, EXPECTED_TREE_HEIGHT
 
 
 def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int = 5,
-                   num_repeats: int = 1, encode: bool = False) -> float:
+                   num_repeats: int = 25, encode: bool = False) -> float:
     accuracy: float = 0.0
+    import time; start = time.time()
+    if encode:
+        data = pd.get_dummies(data)
     for k in range(num_repeats):
         kf = KFold(num_splits, shuffle=True)
         for i, (train_index, test_index) in enumerate(kf.split(data)):
-            if encode:
-                data = pd.get_dummies(data)
             train_data: pd.DataFrame = data.iloc[train_index]
             train_labels: pd.Series = labels.iloc[train_index]
             test_data: pd.DataFrame = data.iloc[test_index]
@@ -25,7 +27,43 @@ def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int
             score: float = model.score(test_data, test_labels)
             print(f'{k + 1}.{i + 1}: accuracy: {score * 100:.3f}%')
             accuracy += score
+    print(time.time() - start)
     return accuracy / (num_repeats * num_splits)
+
+
+def cross_validate_parallel(model, data: pd.DataFrame, labels: pd.Series,
+                            num_splits: int = 5, num_repeats: int = 25) -> float:
+    accuracy: float = 0.0
+    processes: List[Process] = []
+    q = Queue()
+    import time; start = time.time()
+    for k in range(num_repeats):
+        kf = KFold(num_splits, shuffle=True)
+        p = Process(target=validate_parallel, args=(model, data, labels, kf, q))
+        p.start()
+        processes.append(p)
+    for process in processes:
+        process.join()
+    scores = []
+    while not q.empty():
+        scores.append(q.get())
+    accuracy += sum(scores)
+    print(time.time() - start)
+    return accuracy / (num_repeats * num_splits)
+
+
+def validate_parallel(model, data, labels, kf, queue) -> None:
+    accuracy: float = 0.0
+    for i, (train_index, test_index) in enumerate(kf.split(data)):
+        train_data: pd.DataFrame = data.iloc[train_index]
+        train_labels: pd.Series = labels.iloc[train_index]
+        test_data: pd.DataFrame = data.iloc[test_index]
+        test_labels: pd.Series = labels.iloc[test_index]
+        model.fit(train_data, train_labels)
+        score = model.score(test_data, test_labels)
+        accuracy += score
+        print(f'accuracy: {score * 100:.3f}%')
+    queue.put(accuracy)
 
 
 def choose_node_split_params(attributes_info: Dict[str, Dict[str, Any]]) -> Tuple[str, int, Union[str, float]]:
