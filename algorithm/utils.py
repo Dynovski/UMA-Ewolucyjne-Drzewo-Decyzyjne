@@ -13,7 +13,6 @@ from config import ALPHA, BETA, EXPECTED_TREE_HEIGHT
 def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int = 5,
                    num_repeats: int = 25, encode: bool = False) -> float:
     accuracy: float = 0.0
-    import time; start = time.time()
     if encode:
         data = pd.get_dummies(data)
     for k in range(num_repeats):
@@ -27,7 +26,6 @@ def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int
             score: float = model.score(test_data, test_labels)
             print(f'{k + 1}.{i + 1}: accuracy: {score * 100:.3f}%')
             accuracy += score
-    print(time.time() - start)
     return accuracy / (num_repeats * num_splits)
 
 
@@ -36,7 +34,6 @@ def cross_validate_parallel(model, data: pd.DataFrame, labels: pd.Series,
     accuracy: float = 0.0
     processes: List[Process] = []
     q = Queue()
-    import time; start = time.time()
     for k in range(num_repeats):
         kf = KFold(num_splits, shuffle=True)
         p = Process(target=validate_parallel, args=(model, data, labels, kf, q))
@@ -48,7 +45,6 @@ def cross_validate_parallel(model, data: pd.DataFrame, labels: pd.Series,
     while not q.empty():
         scores.append(q.get())
     accuracy += sum(scores)
-    print(time.time() - start)
     return accuracy / (num_repeats * num_splits)
 
 
