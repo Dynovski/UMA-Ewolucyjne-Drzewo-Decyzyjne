@@ -7,7 +7,7 @@ from algorithm.edt import EvolutionaryDecisionTree
 
 
 def test():
-    dataloader = get_data_loader(DatasetType.BANK)
+    dataloader = get_data_loader(DatasetType.IRIS)
     dt = DecisionTreeClassifier()
     print(f'Basic tree classifier accuracy: '
           f'{cross_validate(dt, dataloader.get_data(), dataloader.get_labels(), encode=True) * 100:.3f}%')

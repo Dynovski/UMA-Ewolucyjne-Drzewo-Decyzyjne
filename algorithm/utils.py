@@ -1,7 +1,7 @@
 import pandas as pd
 
 from sklearn.model_selection import KFold
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, matthews_corrcoef
 from random import randrange, choice, uniform
 from typing import Dict, Tuple, Any, List, Optional, Union
 
@@ -14,13 +14,12 @@ def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int
     for k in range(num_repeats):
         kf = KFold(num_splits, shuffle=True)
         for i, (train_index, test_index) in enumerate(kf.split(data)):
+            if encode:
+                data = pd.get_dummies(data)
             train_data: pd.DataFrame = data.iloc[train_index]
             train_labels: pd.Series = labels.iloc[train_index]
             test_data: pd.DataFrame = data.iloc[test_index]
             test_labels: pd.Series = labels.iloc[test_index]
-            if encode:
-                train_data = pd.get_dummies(train_data)
-                test_data = pd.get_dummies(test_data)
             model.fit(train_data, train_labels)
             score: float = model.score(test_data, test_labels)
             print(f'{k + 1}.{i + 1}: accuracy: {score * 100:.3f}%')
