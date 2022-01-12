@@ -70,7 +70,7 @@ class WineQualityRedDataLoader(DataLoader):
             'datasets/WineQuality/winequality-red.csv',
             'Quality',
             ['Fixed acidity', 'Volatile acidity', 'Citrid acid', 'Residual sugar',
-             'Chlorides', 'Free sulfur dioxide', 'Density', 'PH', 'Sulphates', 'Alcohol'],
+             'Chlorides', 'Free sulfur dioxide', 'Total sulfur dioxide', 'Density', 'PH', 'Sulphates', 'Alcohol'],
             ';'
         )
 
@@ -81,7 +81,7 @@ class WineQualityWhiteDataLoader(DataLoader):
             'datasets/WineQuality/winequality-white.csv',
             'Quality',
             ['Fixed acidity', 'Volatile acidity', 'Citrid acid', 'Residual sugar',
-             'Chlorides', 'Free sulfur dioxide', 'Density', 'PH', 'Sulphates', 'Alcohol'],
+             'Chlorides', 'Free sulfur dioxide', 'Total sulfur dioxide', 'Density', 'PH', 'Sulphates', 'Alcohol'],
             ';'
         )
 

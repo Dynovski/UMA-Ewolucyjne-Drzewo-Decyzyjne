@@ -8,7 +8,8 @@ from typing import Dict, Tuple, Any, List, Optional, Union
 from config import ALPHA, BETA, EXPECTED_TREE_HEIGHT
 
 
-def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int = 5, num_repeats: int = 25) -> float:
+def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int = 5,
+                   num_repeats: int = 1, encode: bool = False) -> float:
     accuracy: float = 0.0
     for k in range(num_repeats):
         kf = KFold(num_splits, shuffle=True)
@@ -17,6 +18,9 @@ def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int
             train_labels: pd.Series = labels.iloc[train_index]
             test_data: pd.DataFrame = data.iloc[test_index]
             test_labels: pd.Series = labels.iloc[test_index]
+            if encode:
+                train_data = pd.get_dummies(train_data)
+                test_data = pd.get_dummies(test_data)
             model.fit(train_data, train_labels)
             score: float = model.score(test_data, test_labels)
             print(f'{k + 1}.{i + 1}: accuracy: {score * 100:.3f}%')
