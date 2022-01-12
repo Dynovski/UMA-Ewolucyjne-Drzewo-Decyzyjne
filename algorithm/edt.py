@@ -1,20 +1,19 @@
 import numpy as np
-
-from time import time
-from typing import List, Optional, Dict, Any
-
 import pandas as pd
+
 from sklearn.metrics import accuracy_score
+from typing import List, Optional, Dict, Any
 from random import choice, choices, random, uniform, randrange
 
 import config as cfg
 
-from .edt_components import Node, CandidateTree, NodeType
-from data_processing.data import Data
+from data_processing.dataloader import DataLoader
+from algorithm.edt_components import Node, CandidateTree, NodeType
+from algorithm.utils import evaluate_candidates, choose_node_split_params
 
 
 class EvolutionaryDecisionTree:
-    def __init__(self):
+    def __init__(self, data_info: Dict[str, Dict[str, Any]], all_labels: np.ndarray):
         self.population_size: int = cfg.POPULATION_SIZE
         self.tournament_size: int = cfg.TOURNAMENT_SIZE
         self.split_prob: float = cfg.SPLIT_PROBABILITY
@@ -24,17 +23,16 @@ class EvolutionaryDecisionTree:
         self.max_iters: int = cfg.MAX_ITERATIONS
         self.stall_iters: int = cfg.STALL_ITERATIONS
         self.tree: Optional[CandidateTree] = None
+        self.data_info: Dict[str, Dict[str, Any]] = data_info
+        self.all_labels: np.ndarray = all_labels
 
     def fit(self, data: pd.DataFrame, labels: pd.Series) -> None:
-        start = time()
         population: List[CandidateTree] = [
             CandidateTree.generate_tree(self.split_prob, data, labels) for _ in range(self.population_size)
         ]
-        self.evaluate_population(population, data, labels)
+        evaluate_candidates(population, data, labels)
         best_tree: CandidateTree = population[0]
         stall_iterations: int = 0
-        attr_info: Dict[str, Dict[str, Any]] = Data.attributes_info(data)
-        unique_labels: List[str] = labels.unique().tolist()
 
         for _ in range(self.max_iters):
             if stall_iterations >= self.stall_iters:
@@ -42,14 +40,15 @@ class EvolutionaryDecisionTree:
 
             new_population: List[CandidateTree] = []
             selected_individuals: List[CandidateTree] = self.select(population)
-            for j, individual in enumerate(selected_individuals):
+            for individual in selected_individuals:
+                individual = individual.copy()
                 if random() < self.crossover_prob:
                     individual = self.crossover(selected_individuals, individual)
                 if random() < self.mutation_prob:
-                    individual = self.mutate(individual, attr_info, unique_labels)
+                    individual = self.mutate(individual)
                 new_population.append(individual)
 
-            self.evaluate_population(new_population, data, labels)
+            evaluate_candidates(new_population, data, labels)
             population = self.succession(population, new_population)
             best_candidate: CandidateTree = min(population, key=lambda x: x.fitness)
             if best_candidate.fitness < best_tree.fitness:
@@ -59,7 +58,6 @@ class EvolutionaryDecisionTree:
                 stall_iterations += 1
 
         self.tree = best_tree
-        print(f'Finding best possible model took: {time() - start} seconds')
 
     def select(self, population: List[CandidateTree]) -> List[CandidateTree]:
         elite: List[CandidateTree] = sorted(population, key=lambda x: x.fitness)[:cfg.ELITE_SIZE]
@@ -69,7 +67,7 @@ class EvolutionaryDecisionTree:
             rank = choices(population, k=self.tournament_size)
             selected_individuals.append(min(rank, key=lambda x: x.fitness))
 
-        return selected_individuals
+        return [individual.copy() for individual in selected_individuals]
 
     def crossover(self, all_selected: List[CandidateTree], first_parent: CandidateTree) -> CandidateTree:
         second_parent: CandidateTree = choice(all_selected)
@@ -90,35 +88,19 @@ class EvolutionaryDecisionTree:
             second_random_node.parent = None
             return CandidateTree(second_random_node)
 
-    def mutate(self, individual: CandidateTree, attr_info: Dict[str, Dict[str, Any]], classes: List[str]) -> CandidateTree:
+    def mutate(self, individual: CandidateTree) -> CandidateTree:
         random_node: Node = individual.root.random_node()
         if random_node.node_type == NodeType.LEAF:
-            random_node.label = choice(classes)
+            random_node.label = choice(self.all_labels)
         else:
-            attributes: List[str] = list(attr_info.keys())
-            attribute_idx: int = randrange(len(attributes))
-            attribute = attributes[attribute_idx]
-            attr_data: Dict[str, Any] = attr_info[attribute]
-            threshold = None
-            if attr_data['is_string']:
-                threshold = choice(attr_data['possible_values'])
-            else:
-                threshold = round(uniform(attr_data['min_value'], attr_data['max_value']), 3)
+            attribute, attribute_idx, threshold = choose_node_split_params(self.data_info)
             random_node.attribute = attribute
             random_node.attribute_idx = attribute_idx
             random_node.threshold = threshold
         return individual
 
-    def evaluate_population(self, population: List[CandidateTree], data: pd.DataFrame, labels: pd.Series) -> None:
-        for individual in population:
-            error: float = cfg.ALPHA * (1 - individual.score(data, labels))
-            # changed so that smaller trees are not penalized if they have good score
-            height_penalty: float = cfg.BETA * individual.height() / cfg.EXPECTED_TREE_HEIGHT
-            individual.fitness = error + height_penalty
-
-    def succession(self, previous_population: List[CandidateTree],
-                   new_population: List[CandidateTree]) -> List[CandidateTree]:
-        return sorted(previous_population + new_population, key=lambda x: x.fitness)[:self.population_size]
+    def succession(self, population: List[CandidateTree], new_population: List[CandidateTree]) -> List[CandidateTree]:
+        return sorted(population + new_population, key=lambda x: x.fitness)[:self.population_size]
 
     def predict(self, data: pd.DataFrame) -> np.ndarray:
         if self.tree is None:

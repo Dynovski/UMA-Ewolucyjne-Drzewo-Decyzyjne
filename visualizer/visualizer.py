@@ -7,7 +7,7 @@ import os
 import data_processing.data_loader as loader
 
 
-def save_confusion_matrix(confusion_matrix: np.ndarray, data_type: loader.Dataset, filename: str):
+def save_confusion_matrix(confusion_matrix: np.ndarray, data_type: loader.DatasetType, filename: str):
     save_dir: str = f'results/{data_type.name}'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)

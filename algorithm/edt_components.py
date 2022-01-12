@@ -1,15 +1,16 @@
 import numpy as np
+import pandas as pd
 
 from math import inf
-from random import randint, random, choice, uniform, randrange
+from random import randint, random
 from enum import Enum
 from typing import Union, Optional, Dict, Any, List
 
-import pandas as pd
-from sklearn.metrics import accuracy_score, matthews_corrcoef
-
 import config as cfg
-from data_processing.data import Data
+
+from data_processing.dataloader import DataLoader
+from algorithm.utils import choose_node_split_params
+
 
 class NodeType(Enum):
     ROOT = 0
@@ -31,7 +32,7 @@ class Node:
     ):
         self.parent: Optional[Node] = parent
         self.attribute: str = selected_attribute
-        self.attribute_idx = attribute_idx
+        self.attribute_idx: int = attribute_idx
         self.threshold: Union[float, str, int] = threshold
         self.node_type: NodeType = node_type
         self.left_child: Optional[Node] = left_child
@@ -39,7 +40,8 @@ class Node:
         self.label: Optional[str] = label
 
     def copy(self) -> 'Node':
-        node: 'Node' = Node(self.parent, self.attribute, self.attribute_idx, self.threshold, self.node_type, label=self.label)
+        node: 'Node' = Node(self.parent, self.attribute, self.attribute_idx,
+                            self.threshold, self.node_type, label=self.label)
         if self.node_type != NodeType.LEAF:
             node.left_child = self.left_child.copy()
             node.right_child = self.right_child.copy()
@@ -60,10 +62,17 @@ class Node:
     def predict(self, data: np.ndarray) -> str:
         node = self
         while node.node_type != NodeType.LEAF:
-            if data[node.attribute_idx] > node.threshold:
-                node = node.right_child
+            attribute_value: Union[int, float, str] = data[node.attribute_idx]
+            if isinstance(attribute_value, str):
+                if attribute_value == node.threshold:
+                    node = node.right_child
+                else:
+                    node = node.left_child
             else:
-                node = node.left_child
+                if attribute_value > node.threshold:
+                    node = node.right_child
+                else:
+                    node = node.left_child
         return node.label
 
     def random_node(self) -> 'Node':
@@ -91,68 +100,53 @@ class CandidateTree:
     def random_subtree(self) -> Node:
         return self.root.random_node()
 
-    def score(self, data: pd.DataFrame, labels: pd.Series) -> float:
-        predictions: List[str] = [self.root.predict(x) for x in data.values]
-        return accuracy_score(labels.to_list(), predictions)
-
-    def predict(self, data: pd.DataFrame):
+    def predict(self, data: pd.DataFrame) -> np.ndarray:
         labels: List[str] = [self.root.predict(x) for x in data.values]
         return np.asarray(labels)
 
     @staticmethod
     def generate_tree(split_prob: float, data: pd.DataFrame, labels: pd.Series) -> 'CandidateTree':
-        attributes_info: Dict[str, Dict[str, Any]] = Data.attributes_info(data)
-
-        attributes: List[str] = list(attributes_info.keys())
-        attribute_idx: int = randrange(len(attributes))
-        attribute = attributes[attribute_idx]
-        attr_data: Dict[str, Any] = attributes_info[attribute]
-        threshold = None
-        if attr_data['is_string']:
-            threshold = choice(attr_data['possible_values'])
-        else:
-            threshold = round(uniform(attr_data['min_value'], attr_data['max_value']), 3)
+        attributes_info: Dict[str, Dict[str, Any]] = DataLoader.attributes_info(data)
+        attribute, attribute_idx, threshold = choose_node_split_params(attributes_info)
 
         left_child_data: pd.DataFrame = data.loc[data[attribute] <= threshold]
         left_child_labels: pd.Series = labels.loc[data[attribute] <= threshold]
         right_child_data: pd.DataFrame = data.loc[data[attribute] > threshold]
         right_child_labels: pd.Series = labels.loc[data[attribute] > threshold]
+
         root: Node = Node(None, attribute, attribute_idx, threshold, NodeType.ROOT)
         if left_child_data.shape[0] == 0 or right_child_data.shape[0] == 0:
             # there always must be at least root and two children
-            root.left_child = Node(None, None, None, None, NodeType.LEAF, label=labels.value_counts().idxmax())
-            root.right_child = Node(None, None, None, None, NodeType.LEAF, label=labels.value_counts().idxmax())
+            label = labels.value_counts().idxmax()
+            root.left_child = Node(root, None, None, None, NodeType.LEAF, label=label)
+            root.right_child = Node(root, None, None, None, NodeType.LEAF, label=label)
         else:
             root.left_child = CandidateTree.generate_subtree(root, split_prob, left_child_data, left_child_labels)
             root.right_child = CandidateTree.generate_subtree(root, split_prob, right_child_data, right_child_labels)
         return CandidateTree(root)
 
     @staticmethod
-    def generate_subtree(parent: Node, split_prob: float, data: pd.DataFrame, labels: pd.Series, depth: int = 2) -> Node:
+    def generate_subtree(parent: Node, split_prob: float,
+                         data: pd.DataFrame, labels: pd.Series, depth: int = 2) -> Node:
         if random() < split_prob and depth <= cfg.MAX_TREE_DEPTH:
-            attributes_info: Dict[str, Dict[str, Any]] = Data.attributes_info(data)
-
-            attributes: List[str] = list(attributes_info.keys())
-            attribute_idx: int = randrange(len(attributes))
-            attribute = attributes[attribute_idx]
-            attr_data = attributes_info[attribute]
-            threshold = None
-            if attr_data['is_string']:
-                threshold = choice(attr_data['possible_values'])
-            else:
-                threshold = round(uniform(attr_data['min_value'], attr_data['max_value']), 3)
+            attributes_info: Dict[str, Dict[str, Any]] = DataLoader.attributes_info(data)
+            attribute, attribute_idx, threshold = choose_node_split_params(attributes_info)
 
             left_child_data: pd.DataFrame = data.loc[data[attribute] <= threshold]
             left_child_labels: pd.Series = labels.loc[data[attribute] <= threshold]
             right_child_data: pd.DataFrame = data.loc[data[attribute] > threshold]
             right_child_labels: pd.Series = labels.loc[data[attribute] > threshold]
+
             node: Optional[Node] = None
             if left_child_data.shape[0] == 0 or right_child_data.shape[0] == 0:
-                node: Node = Node(parent, None, None, None, NodeType.LEAF, label=labels.value_counts().idxmax())
+                label = labels.value_counts().idxmax()
+                node: Node = Node(parent, None, None, None, NodeType.LEAF, label=label)
             else:
                 node: Node = Node(parent, attribute, attribute_idx, threshold, NodeType.NORMAL)
-                node.left_child = CandidateTree.generate_subtree(node, split_prob, left_child_data, left_child_labels, depth + 1)
-                node.right_child = CandidateTree.generate_subtree(node, split_prob, right_child_data, right_child_labels, depth + 1)
+                node.left_child = CandidateTree.generate_subtree(node, split_prob, left_child_data,
+                                                                 left_child_labels, depth + 1)
+                node.right_child = CandidateTree.generate_subtree(node, split_prob, right_child_data,
+                                                                  right_child_labels, depth + 1)
             return node
         else:
             label = labels.value_counts().idxmax()
