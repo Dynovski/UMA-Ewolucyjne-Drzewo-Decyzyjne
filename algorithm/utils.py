@@ -1,7 +1,7 @@
 # Author: Zbigniew Dynowski
 import pandas as pd
 
-from multiprocessing import Process, Queue
+from multiprocessing import Pool
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score, matthews_corrcoef
 from random import randrange, choice, uniform
@@ -32,34 +32,27 @@ def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int
 def cross_validate_parallel(model, data: pd.DataFrame, labels: pd.Series,
                             num_splits: int = NUM_SPLITS, num_repeats: int = NUM_REPEATS) -> float:
     accuracy: float = 0.0
-    processes: List[Process] = []
-    q = Queue()
+    args_data: List[Tuple['EvolutionaryDecisionTree', pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]]= []
     for k in range(num_repeats):
         kf = KFold(num_splits, shuffle=True)
-        p = Process(target=validate_parallel, args=(model, data, labels, kf, q))
-        p.start()
-        processes.append(p)
-    for process in processes:
-        process.join()
-    scores = []
-    while not q.empty():
-        scores.append(q.get())
-    accuracy += sum(scores)
+        for train_index, test_index in kf.split(data):
+            train_data: pd.DataFrame = data.iloc[train_index]
+            train_labels: pd.Series = labels.iloc[train_index]
+            test_data: pd.DataFrame = data.iloc[test_index]
+            test_labels: pd.Series = labels.iloc[test_index]
+            args_data.append((model, train_data, train_labels, test_data, test_labels))
+    with Pool() as pool:
+        scores: List[float] = pool.starmap(_fit_and_eval, args_data)
+        accuracy += sum(scores)
     return accuracy / (num_repeats * num_splits)
 
 
-def validate_parallel(model, data: pd.DataFrame, labels: pd.Series, kf: KFold, queue: Queue) -> None:
-    accuracy: float = 0.0
-    for i, (train_index, test_index) in enumerate(kf.split(data)):
-        train_data: pd.DataFrame = data.iloc[train_index]
-        train_labels: pd.Series = labels.iloc[train_index]
-        test_data: pd.DataFrame = data.iloc[test_index]
-        test_labels: pd.Series = labels.iloc[test_index]
-        model.fit(train_data, train_labels)
-        score = model.score(test_data, test_labels)
-        accuracy += score
-        print(f'accuracy: {score * 100:.3f}%')
-    queue.put(accuracy)
+def _fit_and_eval(model, train_data: pd.DataFrame, train_labels: pd.Series,
+                  test_data: pd.DataFrame, test_labels: pd.Series) -> float:
+    model.fit(train_data, train_labels)
+    score = model.score(test_data, test_labels)
+    print(f'accuracy: {score * 100:.3f}%')
+    return score
 
 
 def choose_node_split_params(attributes_info: Dict[str, Dict[str, Any]]) -> Tuple[str, int, Union[str, float]]:
