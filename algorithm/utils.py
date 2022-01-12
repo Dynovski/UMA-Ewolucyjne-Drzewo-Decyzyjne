@@ -7,11 +7,11 @@ from sklearn.metrics import accuracy_score, matthews_corrcoef
 from random import randrange, choice, uniform
 from typing import Dict, Tuple, Any, List, Optional, Union
 
-from config import ALPHA, BETA, EXPECTED_TREE_HEIGHT
+from config import ALPHA, BETA, EXPECTED_TREE_HEIGHT, NUM_SPLITS, NUM_REPEATS
 
 
-def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int = 5,
-                   num_repeats: int = 25, encode: bool = False) -> float:
+def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int = NUM_SPLITS,
+                   num_repeats: int = NUM_REPEATS, encode: bool = False) -> float:
     accuracy: float = 0.0
     if encode:
         data = pd.get_dummies(data)
@@ -30,7 +30,7 @@ def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int
 
 
 def cross_validate_parallel(model, data: pd.DataFrame, labels: pd.Series,
-                            num_splits: int = 5, num_repeats: int = 25) -> float:
+                            num_splits: int = NUM_SPLITS, num_repeats: int = NUM_REPEATS) -> float:
     accuracy: float = 0.0
     processes: List[Process] = []
     q = Queue()
@@ -48,7 +48,7 @@ def cross_validate_parallel(model, data: pd.DataFrame, labels: pd.Series,
     return accuracy / (num_repeats * num_splits)
 
 
-def validate_parallel(model, data, labels, kf, queue) -> None:
+def validate_parallel(model, data: pd.DataFrame, labels: pd.Series, kf: KFold, queue: Queue) -> None:
     accuracy: float = 0.0
     for i, (train_index, test_index) in enumerate(kf.split(data)):
         train_data: pd.DataFrame = data.iloc[train_index]
