@@ -1,3 +1,4 @@
+# Author: Zbigniew Dynowski
 from enum import Enum
 
 import data_processing.dataloader as dl

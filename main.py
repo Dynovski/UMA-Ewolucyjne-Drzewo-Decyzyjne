@@ -1,3 +1,4 @@
+# Author: Zbigniew Dynowski
 from sklearn.tree import DecisionTreeClassifier
 
 from data_processing.utils import get_data_loader, DatasetType

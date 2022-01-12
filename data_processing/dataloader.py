@@ -1,3 +1,4 @@
+# Author: Zbigniew Dynowski
 import pandas as pd
 
 from typing import List, Dict, Any

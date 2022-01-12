@@ -1,3 +1,4 @@
+# Author: Zbigniew Dynowski
 P_CROSSOVER = 0.5
 P_MUTATION = 0.5
 SPLIT_PROBABILITY = 0.5
