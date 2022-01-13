@@ -13,18 +13,28 @@ from algorithm.utils import evaluate_candidates, choose_node_split_params
 
 
 class EvolutionaryDecisionTree:
-    def __init__(self, data_info: Dict[str, Dict[str, Any]], all_labels: np.ndarray):
-        self.population_size: int = cfg.POPULATION_SIZE
+    def __init__(
+            self,
+            data_info: Dict[str, Dict[str, Any]],
+            all_labels: np.ndarray,
+            population_size: int = cfg.POPULATION_SIZE,
+            split_prob: float = cfg.SPLIT_PROBABILITY,
+            expected_height: int = cfg.EXPECTED_TREE_HEIGHT,
+            mutation_prob: float = cfg.P_MUTATION,
+            crossover_prob: float = cfg.P_CROSSOVER
+    ):
+        self.population_size: int = population_size
         self.tournament_size: int = cfg.TOURNAMENT_SIZE
-        self.split_prob: float = cfg.SPLIT_PROBABILITY
-        self.expected_height: int = cfg.EXPECTED_TREE_HEIGHT
-        self.mutation_prob: float = cfg.P_MUTATION
-        self.crossover_prob: float = cfg.P_CROSSOVER
+        self.split_prob: float = split_prob
+        self.expected_height: int = expected_height
+        self.mutation_prob: float = mutation_prob
+        self.crossover_prob: float = crossover_prob
         self.max_iters: int = cfg.MAX_ITERATIONS
         self.stall_iters: int = cfg.STALL_ITERATIONS
         self.tree: Optional[CandidateTree] = None
         self.data_info: Dict[str, Dict[str, Any]] = data_info
         self.all_labels: np.ndarray = all_labels
+        print(f'p_size:{self.population_size}, split_p:{self.split_prob}, e_height:{self.expected_height}, m_p:{self.mutation_prob}, c_p:{self.crossover_prob}')
 
     def fit(self, data: pd.DataFrame, labels: pd.Series) -> None:
         population: List[CandidateTree] = [

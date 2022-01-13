@@ -7,6 +7,7 @@ from sklearn.metrics import accuracy_score, matthews_corrcoef
 from random import randrange, choice, uniform
 from typing import Dict, Tuple, Any, List, Optional, Union
 
+import config as cfg
 from config import ALPHA, BETA, EXPECTED_TREE_HEIGHT, NUM_SPLITS, NUM_REPEATS
 
 
