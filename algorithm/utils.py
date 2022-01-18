@@ -1,5 +1,6 @@
 # Author: Zbigniew Dynowski
 import pandas as pd
+import numpy as np
 
 from multiprocessing import Pool
 from sklearn.model_selection import KFold
@@ -12,8 +13,8 @@ from config import ALPHA, BETA, EXPECTED_TREE_HEIGHT, NUM_SPLITS, NUM_REPEATS
 
 
 def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int = NUM_SPLITS,
-                   num_repeats: int = NUM_REPEATS, encode: bool = False) -> float:
-    accuracy: float = 0.0
+                   num_repeats: int = NUM_REPEATS, encode: bool = False) -> Tuple[float, float, float, float]:
+    accuracies: List[float] = []
     if encode:
         data = pd.get_dummies(data)
     for k in range(num_repeats):
@@ -24,15 +25,13 @@ def cross_validate(model, data: pd.DataFrame, labels: pd.Series, num_splits: int
             test_data: pd.DataFrame = data.iloc[test_index]
             test_labels: pd.Series = labels.iloc[test_index]
             model.fit(train_data, train_labels)
-            score: float = model.score(test_data, test_labels)
-            print(f'{k + 1}.{i + 1}: accuracy: {score * 100:.3f}%')
-            accuracy += score
-    return accuracy / (num_repeats * num_splits)
+            accuracies.append(model.score(test_data, test_labels))
+    return sum(accuracies) / (num_repeats * num_splits), np.std(accuracies).item(), max(accuracies), min(accuracies)
 
 
-def cross_validate_parallel(model, data: pd.DataFrame, labels: pd.Series,
-                            num_splits: int = NUM_SPLITS, num_repeats: int = NUM_REPEATS) -> float:
-    accuracy: float = 0.0
+def cross_validate_parallel(model, data: pd.DataFrame, labels: pd.Series, num_splits: int = NUM_SPLITS,
+                            num_repeats: int = NUM_REPEATS) -> Tuple[float, float, float, float]:
+    accuracies: List[float] = []
     args_data: List[Tuple['EvolutionaryDecisionTree', pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]]= []
     for k in range(num_repeats):
         kf = KFold(num_splits, shuffle=True)
@@ -44,15 +43,14 @@ def cross_validate_parallel(model, data: pd.DataFrame, labels: pd.Series,
             args_data.append((model, train_data, train_labels, test_data, test_labels))
     with Pool() as pool:
         scores: List[float] = pool.starmap(_fit_and_eval, args_data)
-        accuracy += sum(scores)
-    return accuracy / (num_repeats * num_splits)
+        accuracies += scores
+    return sum(accuracies) / (num_repeats * num_splits), np.std(accuracies).item(), max(accuracies), min(accuracies)
 
 
 def _fit_and_eval(model, train_data: pd.DataFrame, train_labels: pd.Series,
                   test_data: pd.DataFrame, test_labels: pd.Series) -> float:
     model.fit(train_data, train_labels)
     score = model.score(test_data, test_labels)
-    print(f'accuracy: {score * 100:.3f}%')
     return score
 
 
@@ -74,4 +72,4 @@ def evaluate_candidates(population: List['CandidateTree'], data: pd.DataFrame, l
         error: float = ALPHA * (1 - accuracy_score(labels.to_list(), individual.predict(data)))
         # changed so that smaller trees are not penalized if they have good score
         height_penalty: float = BETA * individual.height() / EXPECTED_TREE_HEIGHT
-        individual.fitness = error + height_penalty
+        individual.fitness = round(error + height_penalty, 3)

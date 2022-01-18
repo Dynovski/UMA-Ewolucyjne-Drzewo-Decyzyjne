@@ -1,6 +1,4 @@
 # Author: Zbigniew Dynowski
-import sys
-
 from sklearn.tree import DecisionTreeClassifier
 
 import config as cfg
@@ -12,15 +10,16 @@ from algorithm.edt import EvolutionaryDecisionTree
 
 def test():
     for dataset_type in DatasetType:
-        print(dataset_type)
+        print(f'\n{dataset_type}\n')
         dataloader = get_data_loader(dataset_type)
         data = dataloader.get_data()
         labels = dataloader.get_labels()
         data_info = DataLoader.attributes_info(data)
         unique_labels = labels.unique()
         dt = DecisionTreeClassifier()
-        print(f'Basic tree classifier accuracy: '
-              f'{cross_validate(dt, data, labels, encode=True) * 100:.3f}%')
+        avg, std, max_acc, min_acc = cross_validate(dt, data, labels, encode=True)
+        print(f'Basic tree classifier avg_accuracy: {avg * 100:.3f}%, std: {std * 100:.3f}%, '
+              f'max_accuracy: {max_acc * 100:.3f}%, min_accuracy: {min_acc * 100:.3f}%')
 
         for population_size in cfg.POPULATION_SIZE_LIST:
             for expected_height in cfg.EXPECTED_TREE_HEIGHT_LIST:
@@ -36,7 +35,9 @@ def test():
                                 mutation_prob,
                                 crossover_prob
                             )
-                            print(f'Edt classifier accuracy: {cross_validate_parallel(edt, data, labels) * 100:.3f}%')
+                            avg, std, max_acc, min_acc = cross_validate_parallel(edt, data, labels)
+                            print(f'Edt classifier avg_accuracy: {avg * 100:.3f}%, std: {std * 100:.3f}%, '
+                                  f'max_accuracy: {max_acc * 100:.3f}%, min_accuracy: {min_acc * 100:.3f}%')
 
 
 if __name__ == "__main__":

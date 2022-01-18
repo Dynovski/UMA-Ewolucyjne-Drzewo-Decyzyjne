@@ -34,7 +34,8 @@ class EvolutionaryDecisionTree:
         self.tree: Optional[CandidateTree] = None
         self.data_info: Dict[str, Dict[str, Any]] = data_info
         self.all_labels: np.ndarray = all_labels
-        print(f'p_size:{self.population_size}, split_p:{self.split_prob}, e_height:{self.expected_height}, m_p:{self.mutation_prob}, c_p:{self.crossover_prob}')
+        print(f'p_size:{self.population_size}, e_height:{self.expected_height}, split_p:{self.split_prob}, '
+              f' m_p:{self.mutation_prob}, c_p:{self.crossover_prob}')
 
     def fit(self, data: pd.DataFrame, labels: pd.Series) -> None:
         population: List[CandidateTree] = [
